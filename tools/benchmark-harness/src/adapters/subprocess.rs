@@ -230,6 +230,32 @@ impl SubprocessAdapter {
         self.working_dir = Some(dir);
     }
 
+    /// Spawn a persistent subprocess and return its handles.
+    ///
+    /// Used by both `setup()` and the timeout-restart path in `execute_persistent()`.
+    async fn spawn_persistent(&self) -> Result<PersistentProcess> {
+        let mut cmd = Command::new(&self.command);
+        if let Some(dir) = &self.working_dir {
+            cmd.current_dir(dir);
+        }
+        cmd.args(&self.args);
+        for (key, value) in &self.env {
+            cmd.env(key, value);
+        }
+        cmd.stdin(Stdio::piped());
+        cmd.stdout(Stdio::piped());
+        cmd.stderr(Stdio::inherit());
+
+        let mut child = cmd
+            .spawn()
+            .map_err(|e| Error::Benchmark(format!("Failed to spawn persistent process: {}", e)))?;
+
+        let stdin = BufWriter::new(child.stdin.take().unwrap());
+        let stdout = BufReader::new(child.stdout.take().unwrap());
+
+        Ok(PersistentProcess { stdin, stdout, child })
+    }
+
     /// Execute the extraction subprocess
     async fn execute_subprocess(&self, file_path: &Path, timeout: Duration) -> Result<(String, String, Duration)> {
         let start = Instant::now();
@@ -389,7 +415,7 @@ impl SubprocessAdapter {
         // Read lines until we get a JSON response (starts with '{').
         // Non-JSON lines (C library warnings, Python info messages) are skipped.
         let mut line = String::new();
-        let bytes_read = tokio::time::timeout(timeout, async {
+        let read_result = tokio::time::timeout(timeout, async {
             loop {
                 line.clear();
                 let n = proc
@@ -412,8 +438,49 @@ impl SubprocessAdapter {
                 }
             }
         })
-        .await
-        .map_err(|_| Error::Timeout(format!("Persistent process response exceeded {:?}", timeout)))??;
+        .await;
+
+        let bytes_read = match read_result {
+            Ok(Ok(n)) => n,
+            Ok(Err(e)) => {
+                // Inner error (EOF / crash) — restart the process for the next call
+                eprintln!(
+                    "[persistent:{}] process error — killing and restarting: {}",
+                    self.name, e
+                );
+                if let Some(mut old_proc) = guard.take() {
+                    let _ = old_proc.child.kill().await;
+                    let _ = old_proc.child.wait().await;
+                }
+                match self.spawn_persistent().await {
+                    Ok(new_proc) => *guard = Some(new_proc),
+                    Err(re) => eprintln!("[persistent:{}] failed to restart after error: {}", self.name, re),
+                }
+                return Err(e);
+            }
+            Err(_elapsed) => {
+                // Timeout fired — kill the stuck process and restart it to prevent
+                // protocol desync (the old process may still emit a response later
+                // that would be mis-attributed to the next file).
+                eprintln!(
+                    "[persistent:{}] timeout after {:?} — killing and restarting process",
+                    self.name, timeout
+                );
+                if let Some(mut old_proc) = guard.take() {
+                    let _ = old_proc.child.kill().await;
+                    let _ = old_proc.child.wait().await;
+                }
+                // Restart so the next call finds a fresh process
+                match self.spawn_persistent().await {
+                    Ok(new_proc) => *guard = Some(new_proc),
+                    Err(e) => eprintln!("[persistent:{}] failed to restart after timeout: {}", self.name, e),
+                }
+                return Err(Error::Timeout(format!(
+                    "Persistent process response exceeded {:?}",
+                    timeout
+                )));
+            }
+        };
 
         let duration = start.elapsed();
 
@@ -1037,28 +1104,8 @@ impl FrameworkAdapter for SubprocessAdapter {
             return Ok(());
         }
 
-        let mut cmd = Command::new(&self.command);
-        if let Some(dir) = &self.working_dir {
-            cmd.current_dir(dir);
-        }
-        cmd.args(&self.args);
-        for (key, value) in &self.env {
-            cmd.env(key, value);
-        }
-        cmd.stdin(Stdio::piped());
-        cmd.stdout(Stdio::piped());
-        // Inherit stderr so persistent process crash messages are visible in CI logs
-        // and the OS pipe buffer doesn't fill up causing broken pipe errors.
-        cmd.stderr(Stdio::inherit());
-
-        let mut child = cmd
-            .spawn()
-            .map_err(|e| Error::Benchmark(format!("Failed to spawn persistent process: {}", e)))?;
-
-        let stdin = BufWriter::new(child.stdin.take().unwrap());
-        let stdout = BufReader::new(child.stdout.take().unwrap());
-
-        *self.process.lock().await = Some(PersistentProcess { stdin, stdout, child });
+        let proc = self.spawn_persistent().await?;
+        *self.process.lock().await = Some(proc);
         Ok(())
     }
 
@@ -1453,6 +1500,67 @@ for line in sys.stdin:
                 }
             }
         }
+
+        adapter.teardown().await.expect("teardown should succeed");
+    }
+
+    #[tokio::test]
+    async fn test_persistent_timeout_kills_and_restarts() {
+        // Create a "slow server" that sleeps 5s on a magic filename, responds instantly otherwise
+        let tmp_dir = tempfile::TempDir::new().unwrap();
+        let script_path = tmp_dir.path().join("slow_server.py");
+        std::fs::write(
+            &script_path,
+            r#"
+import json, sys, time
+for line in sys.stdin:
+    fp = line.strip()
+    if not fp:
+        continue
+    if "SLOW" in fp:
+        time.sleep(5)
+    content = f"processed: {fp}"
+    print(json.dumps({"content": content, "_extraction_time_ms": 1.0}), flush=True)
+"#,
+        )
+        .unwrap();
+
+        let fast_file = tmp_dir.path().join("fast.txt");
+        std::fs::write(&fast_file, "hello").unwrap();
+
+        let slow_file = tmp_dir.path().join("SLOW.txt");
+        std::fs::write(&slow_file, "slow").unwrap();
+
+        let adapter = SubprocessAdapter::with_persistent_mode(
+            "test-timeout",
+            "python3",
+            vec![script_path.to_string_lossy().to_string()],
+            vec![],
+            vec!["txt".to_string()],
+        )
+        .with_max_timeout(Duration::from_secs(2)); // 2s timeout
+
+        adapter.setup().await.expect("setup should succeed");
+
+        // 1. Fast file should work
+        let r1 = adapter.extract(&fast_file, Duration::from_secs(10)).await.unwrap();
+        assert!(r1.success, "fast file should succeed");
+        eprintln!("fast file OK: {:?}", r1.duration);
+
+        // 2. Slow file should timeout (5s sleep > 2s timeout)
+        let r2 = adapter.extract(&slow_file, Duration::from_secs(10)).await.unwrap();
+        assert!(!r2.success, "slow file should fail with timeout");
+        assert_eq!(r2.error_kind, ErrorKind::Timeout);
+        eprintln!("slow file timed out as expected: {:?}", r2.error_message);
+
+        // 3. KEY TEST: fast file should STILL work after the timeout
+        //    (proves the process was killed and restarted, not left in a desync state)
+        let r3 = adapter.extract(&fast_file, Duration::from_secs(10)).await.unwrap();
+        assert!(
+            r3.success,
+            "fast file after timeout should succeed (process was restarted)"
+        );
+        eprintln!("fast file after restart OK: {:?}", r3.duration);
 
         adapter.teardown().await.expect("teardown should succeed");
     }

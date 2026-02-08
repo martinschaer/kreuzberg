@@ -21,12 +21,8 @@ describe("Security Validation Tests", () => {
 				"large.txt": largeContent,
 			});
 
-			const result = await extractBytes(zipBytes, "application/zip");
-
-			expect(result).toBeDefined();
-			const metadata = result.metadata ?? {};
-			expect(typeof metadata.file_count).toBe("number");
-			expect(metadata.file_count).toBeGreaterThan(0);
+			// Compression ratio of ~1028:1 exceeds the 100:1 security limit
+			await expect(extractBytes(zipBytes, "application/zip")).rejects.toThrow(/ZIP bomb/i);
 		});
 
 		it("should reject path traversal attempts in ZIP", async () => {
@@ -286,7 +282,8 @@ endobj`);
 				"bomb.txt": highlyCompressible,
 			});
 
-			await expect(extractBytes(zipBytes, "application/zip")).resolves.toBeDefined();
+			// Compression ratio of ~1029:1 exceeds the 100:1 security limit
+			await expect(extractBytes(zipBytes, "application/zip")).rejects.toThrow(/ZIP bomb/i);
 		});
 	});
 
