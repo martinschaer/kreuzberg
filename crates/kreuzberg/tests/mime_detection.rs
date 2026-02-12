@@ -33,6 +33,7 @@ async fn test_mime_detection_by_extension() {
         ),
         ("test.txt", "text/plain"),
         ("test.md", "text/markdown"),
+        ("test.mdx", "text/mdx"),
         ("test.html", "text/html"),
         ("test.json", "application/json"),
         ("test.xml", "application/xml"),

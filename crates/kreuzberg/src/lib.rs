@@ -108,7 +108,7 @@ pub use core::config::{HierarchyConfig, PdfConfig};
 pub use paddle_ocr::{CacheStats, ModelManager, ModelPaths, PaddleLanguage, PaddleOcrBackend, PaddleOcrConfig};
 
 pub use core::mime::{
-    DOCX_MIME_TYPE, EXCEL_MIME_TYPE, HTML_MIME_TYPE, JSON_MIME_TYPE, MARKDOWN_MIME_TYPE, PDF_MIME_TYPE,
+    DOCX_MIME_TYPE, EXCEL_MIME_TYPE, HTML_MIME_TYPE, JSON_MIME_TYPE, MARKDOWN_MIME_TYPE, MDX_MIME_TYPE, PDF_MIME_TYPE,
     PLAIN_TEXT_MIME_TYPE, POWER_POINT_MIME_TYPE, XML_MIME_TYPE, detect_mime_type, detect_mime_type_from_bytes,
     detect_or_validate, get_extensions_for_mime, validate_mime_type,
 };

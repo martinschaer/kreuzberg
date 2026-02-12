@@ -37,6 +37,7 @@ impl MimeStringPool {
         let mime_types = vec![
             "text/html",
             "text/markdown",
+            "text/mdx",
             "text/x-markdown",
             "text/plain",
             "application/pdf",

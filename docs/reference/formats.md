@@ -32,7 +32,7 @@ All formats support async/await and batch processing. Image formats and PDFs sup
 | Format | Extensions | MIME Type | Extraction Method | OCR Support | Special Features |
 |--------|-----------|-----------|-------------------|-------------|------------------|
 | Plain Text | `.txt` | `text/plain` | Native Rust (streaming) | No | Line/word/character counting, memory-efficient streaming |
-| Markdown | `.md`, `.markdown` | `text/markdown`, `text/x-markdown` | Native Rust (streaming) | No | Header extraction, link detection, code block detection |
+| Markdown | `.md`, `.markdown`, `.mdx` | `text/markdown`, `text/x-markdown`, `text/mdx` | Native Rust (streaming) | No | Header extraction, link detection, code block detection |
 | HTML | `.html`, `.htm` | `text/html`, `application/xhtml+xml` | Native Rust (html-to-markdown-rs) | No | Converts to Markdown, metadata extraction |
 | XML | `.xml` | `application/xml`, `text/xml` | Native Rust (quick-xml streaming) | No | Element counting, unique element tracking |
 | SVG | `.svg` | `image/svg+xml` | Native Rust (XML parser) | No | Treated as XML document |

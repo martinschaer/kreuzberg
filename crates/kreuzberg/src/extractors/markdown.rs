@@ -241,6 +241,7 @@ impl DocumentExtractor for MarkdownExtractor {
 
     fn supported_mime_types(&self) -> &[&str] {
         &[
+            "text/mdx",
             "text/markdown",
             "text/x-markdown",
             "text/x-gfm",
@@ -267,6 +268,7 @@ mod tests {
         let mime_types = extractor.supported_mime_types();
 
         assert!(mime_types.contains(&"text/markdown"));
+        assert!(mime_types.contains(&"text/mdx"));
         assert!(mime_types.contains(&"text/x-markdown"));
         assert!(mime_types.contains(&"text/x-gfm"));
         assert!(mime_types.contains(&"text/x-commonmark"));

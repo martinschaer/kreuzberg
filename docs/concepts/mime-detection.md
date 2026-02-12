@@ -168,6 +168,7 @@ Kreuzberg exports commonly used MIME types as constants:
 pub const PDF_MIME_TYPE: &str = "application/pdf";
 pub const HTML_MIME_TYPE: &str = "text/html";
 pub const MARKDOWN_MIME_TYPE: &str = "text/markdown";
+pub const MDX_MIME_TYPE: &str = "text/mdx";
 pub const PLAIN_TEXT_MIME_TYPE: &str = "text/plain";
 pub const EXCEL_MIME_TYPE: &str = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
 pub const POWER_POINT_MIME_TYPE: &str = "application/vnd.openxmlformats-officedocument.presentationml.presentation";

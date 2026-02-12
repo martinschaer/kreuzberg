@@ -10,6 +10,7 @@ use std::path::Path;
 
 pub const HTML_MIME_TYPE: &str = "text/html";
 pub const MARKDOWN_MIME_TYPE: &str = "text/markdown";
+pub const MDX_MIME_TYPE: &str = "text/mdx";
 pub const PDF_MIME_TYPE: &str = "application/pdf";
 pub const PLAIN_TEXT_MIME_TYPE: &str = "text/plain";
 pub const POWER_POINT_MIME_TYPE: &str = "application/vnd.openxmlformats-officedocument.presentationml.presentation";
@@ -42,6 +43,7 @@ static EXT_TO_MIME: Lazy<HashMap<&'static str, &'static str>> = Lazy::new(|| {
     m.insert("txt", PLAIN_TEXT_MIME_TYPE);
     m.insert("md", MARKDOWN_MIME_TYPE);
     m.insert("markdown", MARKDOWN_MIME_TYPE);
+    m.insert("mdx", MDX_MIME_TYPE);
 
     m.insert("pdf", PDF_MIME_TYPE);
 
@@ -137,6 +139,7 @@ static SUPPORTED_MIME_TYPES: Lazy<HashSet<&'static str>> = Lazy::new(|| {
 
     set.insert(PLAIN_TEXT_MIME_TYPE);
     set.insert(MARKDOWN_MIME_TYPE);
+    set.insert(MDX_MIME_TYPE);
     set.insert("text/x-markdown");
 
     set.insert("image/bmp");
@@ -607,6 +610,7 @@ mod tests {
         let test_cases = vec![
             ("test.txt", PLAIN_TEXT_MIME_TYPE),
             ("test.md", MARKDOWN_MIME_TYPE),
+            ("test.mdx", MDX_MIME_TYPE),
             ("test.html", HTML_MIME_TYPE),
             ("test.htm", HTML_MIME_TYPE),
         ];

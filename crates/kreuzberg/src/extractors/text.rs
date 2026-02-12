@@ -204,6 +204,7 @@ impl DocumentExtractor for MarkdownExtractor {
     fn supported_mime_types(&self) -> &[&str] {
         &[
             "text/markdown",
+            "text/mdx",
             "text/x-markdown",
             "text/x-markdown-extra",
             "text/x-multimarkdown",
@@ -288,6 +289,7 @@ mod tests {
             extractor.supported_mime_types(),
             &[
                 "text/markdown",
+                "text/mdx",
                 "text/x-markdown",
                 "text/x-markdown-extra",
                 "text/x-multimarkdown"

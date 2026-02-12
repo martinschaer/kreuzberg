@@ -273,6 +273,7 @@ const result = await extractBytes(bytes, 'application/pdf', config);
 - **ODT** - `application/vnd.oasis.opendocument.text`
 - **Images** - `image/png`, `image/jpeg`, `image/webp`
 - **Markdown** - `text/markdown`
+- **MDX** - `text/mdx`
 - **Plain Text** - `text/plain`
 
 ## TypeScript Configuration
